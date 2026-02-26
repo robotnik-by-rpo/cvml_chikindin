@@ -63,7 +63,7 @@ def make_train(path):
             # print(p)
             train.append(extractor(imread(p)))
             responses.append(ncls)
-    train = np.array(train,dtype = "f4").reshape(-1,2)
+    train = np.array(train,dtype = "f4").reshape(-1,5)
     responses = np.array(responses, dtype = "f4").reshape(-1,1)
     return train, responses
 
@@ -106,7 +106,7 @@ for im in sorted(data.glob("*.png")):
     chars, _, _ = segment_text_vertical_projection(image)
     for c in chars:
         find.append(extractor(c))
-    find = np.array(find, dtype = "f4").reshape(-1,2)
+    find = np.array(find, dtype = "f4").reshape(-1,5)
     ret, results, neightbours, dist = knn.findNearest(find,5) 
     # images_phrase.append("".join(results))
     images_phrase.append(preper_word(results))
