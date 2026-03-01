@@ -7,6 +7,12 @@ from skimage.io import imread
 # from skimage.morphology import binary_dilation, disk,binary_opening, binary_closing, binary_erosion
 from collections import defaultdict
 
+def phrase(res, map_char):
+    str_res = ""
+    for r in res:
+        str_res += map_char[float(r[0])]
+    return str_res
+
 def make_train(path):
     cls_map = {}
     train = []
@@ -14,17 +20,17 @@ def make_train(path):
     ncls = 0
     for cls in sorted(path.glob("*")):
         ncls += 1
-        
-        # if cls.name[0] =="s" and len(cls.name) == 2:
-        #     cls.name = cls.name[1]
+        if len(cls.name)> 2:
+            cls_map[float(ncls)] = cls.name[1]
+        else:
+            cls_map[float(ncls)] = cls.name[0]
         print(cls.name,ncls)
         for p in cls.glob("*.png"):
-            # print(p)
             train.append(extractor(imread(p)))
             responses.append(ncls)
-    train = np.array(train,dtype = "f4").reshape(-1,5)
+    train = np.array(train,dtype = "f4").reshape(-1,7)
     responses = np.array(responses, dtype = "f4").reshape(-1,1)
-    return train, responses
+    return train, responses,cls_map
 
 def extractor(image):
     if image.ndim == 2:
@@ -36,15 +42,7 @@ def extractor(image):
     lb = label(binary)
     props = regionprops(lb)[0]
 
-    cy,cx = props.centroid_local
-    shape = props.image.shape
-
-    return np.array([props.eccentricity,
-                     props.area / np.pi**0.5,
-                     props.area / props.perimeter*1.5,
-                     cy / shape[0],
-                     cx / shape[1]
-                     ],dtype="f4")
+    return props.moments_hu
 
 data = Path("./task")
 #Итоговые результаты полученных слов
@@ -54,7 +52,7 @@ for im in sorted(data.glob("*.png")):
     image = imread(im)
 
     #Обучающий датасет
-    train, responses = make_train(data/"train")
+    train, responses,res_map = make_train(data/"train")
     knn = cv2.ml.KNearest.create()
     knn.train(train,cv2.ml.ROW_SAMPLE, responses)
 
@@ -66,7 +64,11 @@ for im in sorted(data.glob("*.png")):
     props = regionprops(lb)
     for prop in props:
         find.append(extractor(prop.image))
-    find = np.array(find, dtype = "f4").reshape(-1,5)
-    ret, results, neightbours, dist = knn.findNearest(find,5) 
+    find = np.array(find, dtype = "f4").reshape(-1,7)
+    ret, results, neightbours, dist = knn.findNearest(find,5)
+
+    images_phrase.append(phrase(results, res_map))
+
+    # print(neightbours)
 
 print(images_phrase)
