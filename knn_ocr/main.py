@@ -4,68 +4,34 @@ import cv2
 from pathlib import Path
 from skimage.measure import regionprops, label
 from skimage.io import imread
-# from skimage.morphology import binary_dilation, disk,binary_opening, binary_closing, binary_erosion
-from collections import defaultdict
 
-"""подправить кодирование строчных букв из файлов для корректного названия классов"""
+def phrase(res, map_char,idx,spaces):
+    str_res = idx+": "  
+    for i,r in enumerate(res):
+        str_res += map_char[float(r[0])]
+        if i+1 in spaces:
+            str_res += " "
+    return str_res
 
-def preper_word(words):
-    res = ""
-    for w in words:
-        if len(w)==2 and w[0] == 's':
-            res += w[1]
-        else:
-            res += w[0]
-    return res
-
-def segment_text_vertical_projection(image):
-
-    binary = image.copy()
-    # Вертикальная проекция (сумма пикселей по вертикали)
-    vertical_projection = np.sum(binary, axis=0) // 255
-    
-    # Поиск границ символов
-    chars = []
-    in_char = False
-    start = 0
-    
-    for i, value in enumerate(vertical_projection):
-        if value > 0 and not in_char:
-            in_char = True
-            start = i
-        elif value == 0 and in_char:
-            in_char = False
-            end = i
-            # Проверка ширины символа (отсеиваем шум)
-            if end - start > 5:  # минимальная ширина символа
-                chars.append((start, end))
-    
-    # Анализ пробелов между символами
-    spaces = []
-    for i in range(len(chars) - 1):
-        gap = chars[i+1][0] - chars[i][1]
-        if gap > 20:  # порог для определения пробела между словами
-            spaces.append(i)
-    
-    return chars, spaces, binary
 
 def make_train(path):
+    cls_map = {}
     train = []
     responses = []
     ncls = 0
     for cls in sorted(path.glob("*")):
         ncls += 1
-        
-        # if cls.name[0] =="s" and len(cls.name) == 2:
-        #     cls.name = cls.name[1]
-        print(cls.name,ncls)
+        if len(cls.name)== 2:
+            cls_map[float(ncls)] = cls.name[1]
+        else:
+            cls_map[float(ncls)] = cls.name[0]
+        # print(cls.name,ncls)
         for p in cls.glob("*.png"):
-            # print(p)
             train.append(extractor(imread(p)))
             responses.append(ncls)
-    train = np.array(train,dtype = "f4").reshape(-1,5)
+    train = np.array(train,dtype = "f4").reshape(-1,9)
     responses = np.array(responses, dtype = "f4").reshape(-1,1)
-    return train, responses
+    return train, responses,cls_map
 
 def extractor(image):
     if image.ndim == 2:
@@ -73,43 +39,49 @@ def extractor(image):
     else:
 
         gray = np.mean(image,axis = 2).astype('u1')
-        binary = gray <255
+        binary = gray > 0
     lb = label(binary)
-    props = regionprops(lb)[0]
-
-    cy,cx = props.centroid_local
-    shape = props.image.shape
-
-    return np.array([props.eccentricity,
-                     props.area / np.pi**0.5,
-                     props.area / props.perimeter*1.5,
-                     cy / shape[0],
-                     cx / shape[1]
-                     ],dtype="f4")
+    props = max(regionprops(lb), key=lambda r: r.area)
+    return np.hstack([props.moments_hu, [props.eccentricity,props.solidity]], dtype="f4")
 
 data = Path("./task")
+
 #Итоговые результаты полученных слов
 images_phrase = []
 
 for im in sorted(data.glob("*.png")):
+    print(im.name)
+    spaces_index = []
+    last_col = None
+
     image = imread(im)
 
     #Обучающий датасет
-    train, responses = make_train(data/"train")
+    train, responses,res_map = make_train(data/"train")
     knn = cv2.ml.KNearest.create()
     knn.train(train,cv2.ml.ROW_SAMPLE, responses)
 
-    #Тестовый дата сет
+    #Тестовый датасет
     gray = image.mean(2)
-    gray = gray > 0
+    binary = gray > 0
     find = []
-    chars, _, _ = segment_text_vertical_projection(image)
-    for c in chars:
-        find.append(extractor(c))
-    find = np.array(find, dtype = "f4").reshape(-1,5)
-    ret, results, neightbours, dist = knn.findNearest(find,5) 
-    # images_phrase.append("".join(results))
-    images_phrase.append(preper_word(results))
-    plt.imshow(gray)
-    plt.show()
-print(images_phrase)
+    lb = label(binary)
+    char_idx = 0
+    props = sorted(regionprops(lb), key = lambda c: c.centroid[1])
+    for idx, prop in enumerate(props):
+        if prop.area < 300: continue
+        find.append(extractor(prop.image))
+
+        _, min_col, _, max_col = prop.bbox
+        if last_col is not None:
+            if min_col - last_col > 20:
+                spaces_index.append(char_idx)
+                
+        last_col = max_col
+        char_idx += 1
+    find = np.array(find, dtype = "f4").reshape(-1,9)
+    ret, results, neightbours, dist = knn.findNearest(find,5)
+
+    images_phrase.append(phrase(results,res_map,im.name,spaces_index))
+
+print("\n",*images_phrase,sep="\n")
