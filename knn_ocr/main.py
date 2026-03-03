@@ -25,7 +25,7 @@ def make_train(path):
             cls_map[float(ncls)] = cls.name[1]
         else:
             cls_map[float(ncls)] = cls.name[0]
-        # print(cls.name,ncls)
+        
         for p in cls.glob("*.png"):
             train.append(extractor(imread(p)))
             responses.append(ncls)
