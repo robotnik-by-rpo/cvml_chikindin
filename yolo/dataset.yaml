@@ -1,0 +1,8 @@
+names:
+  0: cube
+  1: neither
+  2: sphere
+nc: 3
+path: C:\Users\User\Desktop\rpo\hm_second_course\cvml_chikindin\yolo
+train: C:\Users\User\Desktop\rpo\hm_second_course\cvml_chikindin\yolo\ds\images\train
+val: C:\Users\User\Desktop\rpo\hm_second_course\cvml_chikindin\yolo\ds\images\val
