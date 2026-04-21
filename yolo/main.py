@@ -34,8 +34,8 @@ while camera.isOpened():
                 for  (box, conf, name) in zip(boxes_xyxy, confidences, cls_names):
                     x1, y1, x2, y2 = box.tolist()
                     color = (0, 0, 255) if name == "cube" else (0, 255, 0)
-                cv2.rectangle(annotated, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
-                cv2.putText(annotated, f"{name}: {conf:.2f}", (int(x1), int(y1)-5), 
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)   
+                    cv2.rectangle(annotated, (int(x1), int(y1)), (int(x2), int(y2)), color, 2)
+                    cv2.putText(annotated, f"{name}: {conf:.2f}", (int(x1), int(y1)-5), 
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)   
     cv2.imshow("Camera", annotated)
         
